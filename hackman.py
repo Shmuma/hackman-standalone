@@ -9,15 +9,29 @@ import operator
 from game import Game
 from copy import deepcopy
 
+from . import player
+
 try:
     from sys import maxint
 except ImportError:
     from sys import maxsize as maxint
 
+LAND = -2
+WATER = -1
+MAP_OBJECT = '.%'
+
+PLAYER1 = 0
+PLAYER2 = 1
+BUG = 2
+WEAPON = 3
+CODE = 4
+
+VALID_ORDERS = ["up", "down", "left", "right"]
+
 class Hackman(Game):
     def __init__(self, options=None):
         self.cutoff = None
-#        map_text = options['map']
+        map_text = options['map']
 #        self.turns = int(options['turns'])
 #        self.loadtime = int(options['loadtime'])
 #        self.turntime = int(options['turntime'])
@@ -32,11 +46,9 @@ class Hackman(Game):
             randint(-maxint-1, maxint))
 
         seed(self.engine_seed)
-        self.field = [ EMPTY for j in range(0, field_size * field_size) ]
-        self.macroboard = [ ACTIVE for j in range (0, macroboard_size * macroboard_size) ]
-
         self.turn = 0
         self.num_players = 2 # map_data["players"]
+        self.players = [player.Player(), player.Player()]
         self.player_to_begin = randint(0, self.num_players)
         # used to cutoff games early
         self.cutoff_turns = 0
@@ -52,7 +64,7 @@ class Hackman(Game):
         self.bonus = [0]*self.num_players
         self.score_history = [[s] for s in self.score]
 
-        # used to track dead players, ants may still exist, but orders are not processed # Ants?
+        # used to track dead players
         self.killed = [False for _ in range(self.num_players)]
 
         # used to give a different ordering of players to each player;
@@ -70,12 +82,86 @@ class Hackman(Game):
         ### collect turns for the replay
         self.replay_data = []
 
+        self.map_data = self.parse_map(map_text)
+
+    def string_cell_item(self, item):
+        if item == PLAYER1:
+            return '0'
+        elif item == PLAYER2:
+            return '1'
+        elif item == BUG:
+            return 'E'
+        elif item == WEAPON:
+            return 'W'
+        elif item == CODE:
+            return 'C'
+        else:
+            return ''
+
     def output_cell (self, cell):
-        if cell == DRAW: return str(EMPTY)
-        else: return str(cell)
+        if len(cell) == 0:
+            return '.'
+        elif WATER in cell:
+            return 'x'
+        else:
+            result = ""
+            for item in cell:
+                result += self.string_cell_item(item)
+            return result
 
     def string_field (self, field):
         return ','.join([self.output_cell (cell) for cell in field])
+
+    def parse_map(self, map_text):
+        """ Parse the map_text into a more friendly data structure """
+        cols = None
+        rows = None
+        agents_per_player = None
+        agents = []
+        num_players = None
+        count_row = 0
+        grid = [[]]
+        for line in map_text.split("\n"):
+            line = line.strip()
+
+            # ignore blank lines and comments
+            if not line or line[0] == "#":
+                continue
+
+            key, value = line.split(" ", 1)
+            key = key.lower()
+
+            if key == "cols":
+                cols = int(value)
+                if rows != None:
+                    grid = [([] * cols) * rows]
+            elif key == "rows":
+                rows = int(value)
+                if cols != None:
+                    grid = [ [ [] * cols] * rows]
+            elif key == 'm':
+                if len(value) != cols:
+                    raise Exception("map",
+                                    "Incorrect number of cols in row %s. "
+                                    "Got %s, expected %s."
+                                    %(row, len(value), width))
+                for count_col, c in enumerate(value):
+                    if c == MAP_OBJECT[WATER]:
+                        grid[count_row][count_col].append(WATER)
+#                    elif c == MAP_OBJECT[LAND]:
+#                        grid[count_row][count_col].append(LAND)
+                    elif c not in MAP_OBJECT:
+                        raise Exception("map",
+                                        "Invalid character in map: %s" % c)
+                count_row += 1
+        if count_row != rows:
+                    raise Exception("map",
+                                    "Incorrect number of rows in map "
+                                    "Got %s, expected %s."
+                                    %(count_row, rows))
+        return {
+            "size": (rows, cols),
+            "grid" : grid }
 
     def render_changes(self, player, time_to_move):
         """ Create a string which communicates the updates to the state
@@ -93,25 +179,34 @@ class Hackman(Game):
 
         """
         changes = []
-        changes.extend([['update game round', int(self.turn / 2)]])
-        changes.extend([['update game move', self.turn]])
-        changes.extend([['update game macroboard', self.string_field(self.macroboard)]])
-        changes.extend([['update game field', self.string_field(self.field)]])
+        changes.extend([['update game round', self.turn]])
+        changes.extend([['update game field', self.string_field(self.grid)]])
+        changes.extend([['update player0 snippets', self.players[0].snippets]])
+        changes.extend([['update player0 has_weapon', self.players[0].has_weapon]])
+        changes.extend([['update player0 is_paralyzed', self.players[0].is_paralyzed]])
+        changes.extend([['update player1 snippets', self.players[1].snippets]])
+        changes.extend([['update player1 has_weapon', self.players[1].has_weapon]])
+        changes.extend([['update player1 is_paralyzed', self.players[1].is_paralyzed]])
         changes.extend([['action move', int(time_to_move * 1000)]]) 
         return changes
-#        changes.extend(sorted(
-#            ['p', p["player_id"]]
-#            for p in self.players if self.is_alive(p["player_id"])))
-#         changes.extend(sorted(
-#             ['a', a["row"], a["col"], a["heading"], a["owner"]]
-#             for a in self.agents))
-#         changes.extend(sorted(
-#             ['d', a["row"], a["col"], a["heading"], a["owner"]]
-#             for a in self.killed_agents))
-#         return changes
+
+    def convert_move(self, move):
+        """ Convert text string to co-ordinate offset
+        """
+        if move == "up":
+            return {row : -1, col : 0}
+        elif move == "down":
+            return {row: 1, col : 0}
+        elif move == "left":
+            return {row: 0, col : -1}
+        elif move == "right":
+            return {row: 0, col : 1}
+        else:
+            raise ValueError("Failed to convert string to move: " + move)
 
     def parse_orders(self, player, lines):
         """ Parse orders from the given player
+        player is an integer
         """
         orders = []
         valid = []
@@ -130,21 +225,21 @@ class Hackman(Game):
 
             data = line.split()
 
-            # validate data format
-            if data[0] != 'place_move':
-                invalid.append((line, 'unknown action'))
-                continue
-            else:
-                col, row = data[1:]
-
-            # validate the data types
             try:
-                row, col = int(row), int(col)
+
+                # validate data format
+                if data[0] not in VALID_ORDERS:
+                    invalid.append((line, 'unknown action'))
+                    continue
+                else:
+                    move = self.convert_move(data[0])
+
+                row, col = self.player[player].row + move.row, self.player[player].col + move.col
                 orders.append((player, row, col))
                 valid.append(line)
 
             except ValueError:
-                invalid.append((line, "row and col should be integers"))
+                invalid.append((line, "submitted move is invalid: " + line))
                 continue
 
         return orders, valid, ignored, invalid
@@ -153,8 +248,7 @@ class Hackman(Game):
 
     def bots_to_play(self, turn):
         """ Indices of the bots who should receive the game state and return orders now """
-        if turn == 0: return [1, 0]
-        else: return [(turn + 1) % 2]
+        return [0, 1]
 
     def board_symbol(self, cell):
         if cell == EMPTY:
@@ -490,7 +584,7 @@ class Hackman(Game):
         return ''
 
     def do_moves(self, player, moves):
-        """ Called by engine to give latest player orders """
+        """ Called by engine to deliver latest player orders """
         orders, valid, ignored, invalid = self.parse_orders(player, moves)
 #        orders, valid, ignored, invalid = self.validate_orders(player, orders, valid, ignored, invalid)
         self.orders[player] = orders
