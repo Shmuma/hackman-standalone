@@ -28,8 +28,17 @@ CODE = 4
 
 VALID_ORDERS = ["up", "down", "left", "right"]
 
+ADJACENT = [
+    (-1, 0),
+    (0, 1),
+    (1, 0),
+    (0, -1)
+]
+
 class Hackman(Game):
     def __init__(self, options=None):
+        self.width = 0
+        self.height = 0
         self.cutoff = None
         map_text = options['map']
 #        self.turns = int(options['turns'])
@@ -98,6 +107,9 @@ class Hackman(Game):
         else:
             return ''
 
+    def in_bounds (self, row, col):
+        return row > 0 and col > 0 and col < self.width and row < self.height
+
     def output_cell (self, cell):
         if len(cell) == 0:
             return '.'
@@ -133,10 +145,12 @@ class Hackman(Game):
 
             if key == "cols":
                 cols = int(value)
+                self.width = cols
                 if rows != None:
                     grid = [([] * cols) * rows]
             elif key == "rows":
                 rows = int(value)
+                self.height = rows
                 if cols != None:
                     grid = [ [ [] * cols] * rows]
             elif key == 'm':
@@ -251,16 +265,22 @@ class Hackman(Game):
         return [0, 1]
 
     def board_symbol(self, cell):
-        if cell == EMPTY:
-            return ". "
-        elif cell == ACTIVE:
-            return "! "
-        elif cell == PLAYER1:
-            return "o "
+        if cell == PLAYER1:
+            return '0'
         elif cell == PLAYER2:
-            return "x "
-        elif cell == DRAW:
-            return "- "
+            return '1'
+        elif cell == BUG:
+            return 'E'
+        elif cell == WEAPON:
+            return 'W'
+        elif cell == CODE:
+            return 'C'
+        elif cell == LAND:
+            return '.'
+        elif cell == WATER:
+            return 'x'
+        else:
+            raise ValueError ("Invalid board_symbol: " + cell)
 
     def text_board(self):
         count = 0
@@ -271,129 +291,36 @@ class Hackman(Game):
                 print(output)
                 output=""
                 count = 0
-            output += self.board_symbol(cell)
+            if len(cell) > 0:
+                output += self.board_symbol(cell[0])
+            else:
+                output += self.board_symbol(LAND)
             count += 1
         print(output)
-
-    def text_macroboard(self):
-        count = 0
-        print ("\n")
-        output = ""
-        for cell in self.macroboard:
-            if count >= macroboard_size:
-                print(output)
-                output=""
-                count = 0
-            output += self.board_symbol(cell)
-            count += 1
-        print(output)
-        print("")
 
     def player_cell (self, player):
         if player == 0: return PLAYER1 
         else: return PLAYER2
 
-    def clear_active_macroboard(self):
-        for count in range(0, len(self.macroboard)):
-            if self.macroboard[count] == ACTIVE:
-                self.macroboard[count] = EMPTY
+    def adjacent_coords (self, row, col):
+        result = []
+        for (orow, ocol) in ADJACENT:
+            (trow, tcol) = (row + orow, col + ocol)
+            if self.in_bounds (trow, tcol):
+                result.append((trow, tcol))
 
-    def get_board_cell (self, row, col):
-        return self.field[int(row) * field_size + int(col)]
+    def is_legal(self, player, row, col):
+        in_range = (row, col) in self.adjacent_coords(self.player[player].row, self.player[player].col)
+        not_blocked = (WATER not in self.grid[row][col])
+        return in_range and not_blocked
 
-    def get_macroboard_cell (self, row, col):
-        return self.macroboard[int(row) * macroboard_size + int(col)]
-
-    def cell_is_full (self, row, col):
-        offr = row * macroboard_size
-        offc = col * macroboard_size
-        result = True
-        for cr in range(0, macroboard_size):
-            for cc in range (0, macroboard_size):
-                result = result and (self.get_board_cell(offr + cr, offc + cc) != EMPTY)
-        return result
-
-    def macroboard_full (self):
-        result = True
-        for cell in self.macroboard:
-            if cell == EMPTY or cell == ACTIVE:
-                result = False
-        return result
-
-    def macroboard_status (self):
-        win = EMPTY
-        for (r0, c0), (r1, c1), (r2, c2) in victory_lines:
-            p0 = self.get_macroboard_cell(r0, c0)
-            p1 = self.get_macroboard_cell(r1, c1)
-            p2 = self.get_macroboard_cell(r2, c2)
-            if p0 != EMPTY and p0 == p1 and p0 == p2:
-                win = p0
-        if win == EMPTY or win == ACTIVE:
-            if self.macroboard_full():
-                return DRAW
-            else:
-                return EMPTY
-        else:
-            return win
-        
-    def sub_board_status (self, row, col):
-        offr = row * macroboard_size
-        offc = col * macroboard_size
-        win = EMPTY
-        for (r0, c0), (r1, c1), (r2, c2) in victory_lines:
-            p0 = self.get_board_cell(offr + r0, offc + c0)
-            p1 = self.get_board_cell(offr + r1, offc + c1)
-            p2 = self.get_board_cell(offr + r2, offc + c2)
-            if p0 != EMPTY and p0 == p1 and p0 == p2:
-                win = p0
-        if win == EMPTY and self.cell_is_full(row, col):
-            return DRAW
-        else:
-            return win
-        
-    
-    def activate_all (self):
-        for i, c in enumerate (self.macroboard):
-            ir = int (i / macroboard_size)
-            ic = i % macroboard_size
-            if c == EMPTY and not self.cell_is_full(ir, ic):
-                self.macroboard[i] = ACTIVE
-
-    def count_active(self):
-        result = 0;
-        for i, c in enumerate (self.macroboard):
-            if self.macroboard[i] == ACTIVE:
-                result += 1
-        return result
-
-    def update_macroboard (self, row, col):
-        self.clear_active_macroboard()
-        ur = int(row / macroboard_size)
-        uc = int(col / macroboard_size)
-        self.macroboard[ur * macroboard_size + uc] = self.sub_board_status (ur, uc)
-#        print("sub_board_status: " + str(self.sub_board_status (ur, uc)) + " " + str ((ur, uc)))
-        mbr = row % macroboard_size
-        mbc = col % macroboard_size
-        if self.macroboard[mbr * macroboard_size + mbc] == EMPTY:
-            #print ("Activating cell" + str((mbr, mbc)))
-            self.macroboard[mbr * macroboard_size + mbc] = ACTIVE
-        else:
-            #print ("Activating all\n")
-            self.activate_all()
-        #print(self.string_field(self.macroboard) + "\n")
-
-    def is_legal(self, row, col):
-        mbr = int(row / macroboard_size)
-        mbc = int(col / macroboard_size)
-        return self.get_macroboard_cell (mbr, mbc) == ACTIVE and self.get_board_cell(row, col) == EMPTY
-
-    def place_move(self, move):
-        (player, row, col) = move
-        #print("player = " + str(player))
-        #print("player_cell = " + str(self.player_cell(player)))
-        if self.is_legal (row, col):
-            self.field[row * field_size + col] = self.player_cell(player)
-            self.update_macroboard(row, col)
+#    def place_move(self, move):
+#        (player, row, col) = move
+#        #print("player = " + str(player))
+#        #print("player_cell = " + str(self.player_cell(player)))
+#        if self.is_legal (row, col):
+#            self.field[row * field_size + col] = self.player_cell(player)
+#            self.update_macroboard(row, col)
 
     def do_orders(self):
         """ Execute player orders and handle conflicts
