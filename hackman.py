@@ -91,6 +91,7 @@ class Hackman(Game):
         ### collect turns for the replay
         self.replay_data = []
 
+        self.server = []    # server room locations
         self.map_data = self.parse_map(map_text)
 
     def string_cell_item(self, item):
@@ -153,6 +154,15 @@ class Hackman(Game):
                 self.height = rows
                 if cols != None:
                     grid = [ [ [] * cols] * rows]
+
+            elif key == 'p':
+                loc = value.split()
+                p_num = int(loc[0])
+                p_row = int(loc[1])
+                p_col = int(loc[2])
+                player[p_num].row = p_row
+                player[p_num].col = p_col
+
             elif key == 'm':
                 if len(value) != cols:
                     raise Exception("map",
@@ -168,6 +178,13 @@ class Hackman(Game):
                         raise Exception("map",
                                         "Invalid character in map: %s" % c)
                 count_row += 1
+
+            elif key == 's':    # server room
+                loc = value.split()
+                p_row = int(loc[1])
+                p_col = int(loc[2])
+                self.server.append((p_row, p_col))
+
         if count_row != rows:
                     raise Exception("map",
                                     "Incorrect number of rows in map "
@@ -314,44 +331,29 @@ class Hackman(Game):
         not_blocked = (WATER not in self.grid[row][col])
         return in_range and not_blocked
 
-#    def place_move(self, move):
-#        (player, row, col) = move
-#        #print("player = " + str(player))
-#        #print("player_cell = " + str(self.player_cell(player)))
-#        if self.is_legal (row, col):
-#            self.field[row * field_size + col] = self.player_cell(player)
-#            self.update_macroboard(row, col)
+    def place_move(self, move):
+        (player, row, col) = move
+        p = self.player[player]
+        if self.is_legal (player, row, col):
+            self.grid[p.row][p.col].remove(self.player_cell(player))
+            self.grid[row][col].append(self.player_cell(player))
+            p.row = row
+            p.col = col
 
     def do_orders(self):
         """ Execute player orders and handle conflicts
         """
-        player = self.bots_to_play(self.turn)[0]
-        #print(str(self.orders))
-        #print("player " + str(player))
-        if self.is_alive(player):
-            if len(self.orders[player]) > 0:
-                self.place_move (self.orders[player][0])
-        else:
-            pass
-#        player = self.bots_to_play()[0]
-#        #print(str(self.orders))
-#        #print("player " + str(player))
-#        if self.is_alive(player):
-##            if len(self.orders[player]) > 0:
-#            for player_orders in self.orders:
-#                for porder in player_orders:
-#                    oplayer, row, col = porder
-#                    if player == oplayer:
-#                        print("place_move " + str(porder))
-#                        self.place_move (porder)
-#        else:
-#            pass
+        for player in self.bots_to_play(self.turn):
+            if self.is_alive(player):
+                if len(self.orders[player]) > 0:
+                    self.place_move (self.orders[player][0])
+            else:
+                pass
+        self.resolve_interactions()
 
-
+    def resolve_interactions(self):
+        pass
     # Common functions for all games
-
-    def game_won(self):
-        return self.macroboard_status()
 
     def game_over(self):
         """ Determine if the game is over
@@ -366,14 +368,8 @@ class Hackman(Game):
         elif len(self.remaining_players()) == 1:
             self.cutoff = 'lone survivor'
             return True
-        elif self.game_won() == DRAW:
-            self.cutoff = "Board full"
-            return True
-        elif self.game_won() != EMPTY:
-            self.cutoff = "Game won"
-            return True
-        elif self.count_active() < 1:
-            self.cutoff = "No more moves"
+        elif self.turn >= 200:
+            self.cutoff = 'turn limit reached'
             return True
         else: return False
 
@@ -381,7 +377,7 @@ class Hackman(Game):
         """ Used by engine to signal that a player is out of the game """
         print("Player killed: " + str(player))
         self.killed[player] = True
-        self.score[player] = -1
+        self.player[player].snippets = -1
 
     def start_game(self):
         """ Called by engine at the start of the game """
@@ -392,17 +388,7 @@ class Hackman(Game):
         result = []
 
     def score_game(self):
-        result = self.macroboard_status()
-        if self.score[0] < 0 or self.score[1] < 0:
-            return self.score
-        elif result == EMPTY or result == ACTIVE or result == DRAW:
-            return [0, 0]
-        elif result == PLAYER1:
-            return [1, 0]
-        elif result == PLAYER2:
-            return [0, 1]
-        else:
-            return [0, 0]
+            return [self.player[0].snippets, self.player[1].snippets]
 
     def finish_game(self):
         """ Called by engine at the end of the game """
@@ -429,9 +415,6 @@ class Hackman(Game):
     def finish_turn(self):
         """ Called by engine at the end of the turn """
         self.do_orders()
-        #original.process_new_fleets(self.planets, self.fleets, self.temp_fleets)
-        #self.planets, self.fleets = original.do_time_step(self.planets, self.fleets)
-        #self.score = [original.num_ships_for_player(self.planets, self.fleets, player) for player in (1, 2)]
         # record score in score history
         for i, s in enumerate(self.score):
             if self.is_alive(i):
@@ -522,10 +505,10 @@ class Hackman(Game):
 
             Used by engine for ranking
         """
-        if player is None:
+        #if player is None:
             return self.score
-        else:
-            return self.order_for_player(player, self.score)
+        #else:
+        #    return self.order_for_player(player, self.score)
 
     def order_for_player(self, player, data):
         """ Orders a list of items for a players perspective of player #
