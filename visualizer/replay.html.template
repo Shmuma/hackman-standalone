@@ -1,0 +1,308 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+
+<html>
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+	<title>Ultimate TicTacToe</title>
+	<style type="text/css">
+		html { margin:0; padding:0; }
+		body { margin:0; padding:0; overflow:hidden; background-color:#444}
+		a { color:#777 }
+		a:hover { color:#ddd }
+	</style>
+</head>
+<body>
+<p>
+<center>
+<canvas width=800 height=450 id="C">
+	<script type="text/javascript">
+		replay_data = ## REPLAY PLACEHOLDER ## ;
+		C = document.getElementById('C');
+		V = C.getContext('2d');
+		C.setSize = function(width, height) {
+		        if (this.w !== width || this.h !== height) {
+		                this.w = width;
+		                this.h = height;
+//		                if (width > 0 && height > 0) {
+//		                        this.canvas.width = width;
+//		                        this.canvas.height = height;
+//              		}
+	                this.invalid = true;
+        	        this.resized = true;
+	        	}
+		};
+		the_turn = 0;
+		color = new Array(10);
+		color[0] = [85, 85, 85];
+		color[1] = [0, 200, 200];
+		color[2] = [255, 100, 0];
+		color[3] = [255, 255, 255];
+		color[4] = [255, 255, 255];
+		color[5] = [255, 255, 255];
+		color[6] = [255, 255, 255];
+		color[7] = [255, 255, 255];
+		color[8] = [255, 255, 255];
+		color[9] = [255, 255, 255];
+		color[10] = [255, 255, 255];
+		macrocolor = new Array(10);
+		macrocolor[0] = [25, 25, 25];
+		macrocolor[1] = [146, 255, 255];
+		macrocolor[2] = [255, 200, 128];
+		display_width = 800;
+		display_height = 450;
+		board_square_size = display_height / 13;
+		board_square_padding = board_square_size / 4;
+		macroboard_square_size = 3 * board_square_size + 4 * board_square_padding;
+		macroboard_square_padding = board_square_padding * 2;
+		board_off_x = Math.max(0, display_height - (3 * macroboard_square_size + 2 * macroboard_square_padding));
+		board_off_y = Math.max(0, display_height - (3 * macroboard_square_size + 2 * macroboard_square_padding));
+		nturns = replay_data["replaydata"]["turns"];
+        scores = replay_data["replaydata"]["scores"];
+        playernames = replay_data["playernames"];
+		//console.log("turns = " + nturns);
+		function init() {
+			C.setSize(display_width, display_height); 
+			play();
+		}
+		function clear() {
+			V.fillStyle = 'black';
+			V.fillRect(0,0,display_width,display_height);
+		}
+		function draw_frame(f) {
+			clear();
+			//console.log("turn = " + the_turn);
+			for (iter_frame=f;iter_frame<=f;iter_frame++) {
+				frame = replay_data["replaydata"]["data"][iter_frame]
+				//console.log("frame");
+				//console.log(frame);
+				for (i in frame) {
+					upd = frame[i][1];
+					//console.log(frame[i][0]);
+					if (frame[i][0] == 'updategamemacroboard')
+					{
+						var field = upd.split(",");
+						var count_col = 0
+						var count_row = 0
+						for(cell in field){
+							var rect = macroboard_rect(count_row, count_col);
+							alpha = fade(0.4, 0.8, 2, (the_turn - iter_frame));
+							set_macroboard_color(field[cell], alpha);
+							if (iter_frame != 0)
+								V.fillRect(rect.x,rect.y,rect.width,rect.height);
+							count_col = count_col + 1;
+							if (count_col >= 3) {
+								count_col = 0;
+								count_row = count_row + 1;
+							}
+						}
+
+					}
+					else if (frame[i][0] == 'updategamefield')
+					{
+						var field = upd.split(",");
+						var count_col = 0;
+						var count_row = 0;
+						//console.log(field);
+						for (cell in field){
+							//console.log("cell = " + field[cell]);
+							var rect = board_outer_rect(count_row, count_col);
+							alpha = fade(0.4, 1.0, 2, (the_turn - iter_frame));
+							set_board_color(0, alpha);
+							if (iter_frame != 0)
+								V.fillRect(rect.x,rect.y,rect.width,rect.height);
+							var rect = board_inner_rect(count_row, count_col);
+							alpha = fade(0.4, 0.8, 2, (the_turn - iter_frame));
+							set_board_color(field[cell], alpha);
+							if (iter_frame != 0)
+								V.fillRect(rect.x,rect.y,rect.width,rect.height);
+							count_col = count_col + 1;
+							if (count_col >= 9) {
+								count_col = 0;
+								count_row = count_row + 1;
+							}
+						}
+					}
+				}
+			}
+			display_scores ()
+		}
+//        }
+    function draw_cell(orect, irect, cell) {
+		//console.log("cell = " + cell);
+        V.beginPath();
+		alpha = fade(0.4, 1.0, 2, (the_turn - iter_frame));
+		set_board_color(0, alpha);
+		//if (iter_frame != 0)
+			V.fillRect(orect.x,orect.y,orect.width,orect.height);
+        V.closePath();
+        if (cell != 0 && cell != -1){
+		    alpha = fade(0.4, 1.0, 2, (the_turn - iter_frame));
+		    set_board_color(cell, alpha);
+            V.beginPath();
+            V.arc(irect.x + irect.width / 2 - 0.5, irect.y + irect.height / 2 - 0.5, irect.height / 2 + 1, 0, 2 * Math.PI);
+            V.closePath();
+            V.fill()
+        }
+    }
+
+	function display_scores () {
+            xOffset = 550
+			V.fillStyle = 'white';
+			V.strokeStyle = 'white';
+            V.font = "20px sans";
+			info = "turn "+the_turn;
+			V.fillText(info, xOffset,100);
+			for ( i=0; i<2; i++ ) {
+			    info = "";
+                info += playernames[i];
+//                info += " : "
+//				info += scores[i][the_turn];
+			    V.fillText(info, xOffset,100 + 30 * (i + 1));
+			}
+
+	    	irect1 = {
+	    		x: xOffset - 40,
+	    		y: 114,
+	    		width: board_square_size - 2 * board_square_padding,
+	    		height: board_square_size - 2 * board_square_padding,
+            }
+            margin = 5
+            orect1 = {
+                x: irect1.x - margin,
+                y: irect1.y - margin,
+                width : irect1.width + margin * 2,
+                height: irect1.height + margin * 2,
+            }
+	    	irect2 = {
+	    		x: xOffset - 40,
+	    		y: 145,
+	    		width: board_square_size - 2 * board_square_padding,
+	    		height: board_square_size - 2 * board_square_padding,
+            }
+            orect2 = {
+                x: irect2.x - margin,
+                y: irect2.y - margin,
+                width : irect2.width + margin * 2,
+                height: irect2.height + margin * 2,
+            }
+            draw_cell(orect1, irect1, 1)
+            draw_cell(orect2, irect2, 2)
+
+	/*
+			V.fillStyle = 'white'
+			V.strokeStyle = 'white'
+			info = "turn "+the_turn + "  ["
+			for ( i=0; i<player; i++ ) {
+				info += scores[i][the_turn] 
+				if (i !=player-1)
+					info += ","
+			}
+			info += "]"
+			V.fillText(info, 260,10)
+	*/
+	}
+
+	function macroboard_rect(row, col) {
+		var y = board_off_y + row * macroboard_square_size + macroboard_square_padding + board_square_size / 4;
+		var x = board_off_x + col * macroboard_square_size + macroboard_square_padding + board_square_size / 4;
+		return {
+			x: x,
+			y: y,
+			width: macroboard_square_size - board_square_size / 2,
+			height: macroboard_square_size - board_square_size / 2,
+		}
+	}
+
+	function board_outer_rect(row, col) {
+		var y = board_off_y + row * board_square_size + board_square_padding + (Math.floor(1 + row / 3) * (2 * macroboard_square_padding));
+		var x = board_off_x + col * board_square_size + board_square_padding + (Math.floor(1 + col / 3) * (2 * macroboard_square_padding));
+		return {
+			x: x,
+			y: y,
+			width: board_square_size - 2 * board_square_padding,
+			height: board_square_size - 2 * board_square_padding,
+		}
+	}
+
+	function board_inner_rect(row, col) {
+//		var x = board_off_x + row * board_square_size + 2 * board_square_padding + ((1 + row % 3) * ( 2 * macroboard_square_padding));
+//		var y = board_off_y + col * board_square_size + 2 * board_square_padding + ((1 + col % 3) * ( 2 * macroboard_square_padding));
+		var y = board_off_y + row * board_square_size + board_square_padding + (Math.floor(1 + row / 3) * (2 * macroboard_square_padding));
+		var x = board_off_x + col * board_square_size + board_square_padding + (Math.floor(1 + col / 3) * (2 * macroboard_square_padding));
+		return {
+			x: x + (board_square_size / 16),
+			y: y + (board_square_size / 16),
+			width: board_square_size - (2 * board_square_padding + board_square_size / 8),
+			height: board_square_size - (2 * board_square_padding + board_square_size / 8),
+		}
+	}
+
+	function set_board_color(index, alpha) {
+		//console.log(index);
+		V.fillStyle='rgba(' + color[index][0] + "," + color[index][1] + "," + color[index][2] + "," + alpha + ")"
+	}
+
+	function set_macroboard_color(index, alpha) {
+		if (index < 0) {
+			V.fillStyle='rgba(128,128,128,' + alpha + ')';
+		}
+		else {
+			V.fillStyle='rgba(' + macrocolor[index][0] + "," + macrocolor[index][1] + ',' + macrocolor[index][2] + ',' + alpha + ')';
+		}
+	}
+
+	function fade(base, limit, steps, count) {
+		if (count > steps) return base
+		else {
+			stepsize = (limit - base) / steps
+			return limit - (stepsize * count)
+		}
+	}
+        function stop() {
+            clearInterval(tick)
+            tick=-1
+        }
+        function back() {
+            stop()
+            if ( the_turn > 0 ) 
+                the_turn -= 1
+            draw_frame(the_turn)
+        }
+        function forw() {
+            stop()
+            if ( the_turn < nturns ) 
+                the_turn += 1
+            draw_frame(the_turn)
+        }
+        function pos(t) {
+            stop()
+            the_turn = t
+            draw_frame(the_turn)
+        }
+        function play() {
+	    //console.log("play called");
+            tick = setInterval( function() {
+                if (the_turn <= nturns)
+                {
+                    draw_frame(the_turn)
+                    the_turn += 1
+                } else {
+                    stop()
+                }
+            },200)
+        }
+	init()
+	</script>
+</canvas>
+<div>
+	<a href='javascript:pos(0)'>&lt;&lt;</a>&nbsp;
+	<a href='javascript:back()'>&lt;</a>&nbsp;
+	<a href='javascript:stop()'>stop</a>&nbsp;
+	<a href='javascript:play()'>play</a>&nbsp;
+	<a href='javascript:forw()'>&gt;</a>&nbsp;
+	<a href='javascript:pos(nturns)'>&gt;&gt;</a>&nbsp;
+</div>
+</body>
+</html>
+
+=
