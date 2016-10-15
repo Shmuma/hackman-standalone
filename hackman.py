@@ -14,24 +14,7 @@ try:
 except ImportError:
     from sys import maxsize as maxint
 
-
-EMPTY, PLAYER1, PLAYER2, ACTIVE, DRAW = (0, 1, 2, -1, 3)
-
-field_size = 9
-macroboard_size = 3
-
-victory_lines = [
-    ((0,0), (0, 1), (0, 2)),
-    ((1,0), (1, 1), (1, 2)),
-    ((2,0), (2, 1), (2, 2)),
-    ((0,0), (1, 0), (2, 0)),
-    ((0,1), (1, 1), (2, 1)),
-    ((0,2), (1, 2), (2, 2)),
-    ((0,0), (1, 1), (2, 2)),
-    ((0,2), (1, 1), (2, 0))
-]
-
-class Uttt(Game):
+class Hackman(Game):
     def __init__(self, options=None):
         self.cutoff = None
 #        map_text = options['map']

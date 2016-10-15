@@ -14,7 +14,7 @@ except ImportError:
     from io import StringIO
 
 import visualizer.visualize_locally
-from uttt import Uttt
+from hackman import Hackman
 
 #sys.path.append("../worker")
 try:
@@ -294,7 +294,7 @@ def run_rounds(opts,args):
         game_options['map'] = ""# map_file.read()
         if opts.engine_seed:
             game_options['engine_seed'] = opts.engine_seed + round
-        game = Uttt(game_options)
+        game = Hackman(game_options)
         # initialize bots
         bots = [get_cmd_wd(arg, exec_rel_cwd=opts.secure_jail) for arg in args]
         bot_count = len(bots)
