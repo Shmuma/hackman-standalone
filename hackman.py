@@ -2,6 +2,7 @@
 
 from random import randrange, choice, shuffle, randint, seed, random
 from math import cos, pi, sin, sqrt, atan
+import sys
 
 from fractions import Fraction
 import operator
@@ -9,6 +10,7 @@ from game import Game
 from copy import deepcopy
 
 import player
+import bug
 
 try:
     from sys import maxint
@@ -92,6 +94,7 @@ class Hackman(Game):
         self.replay_data = []
 
         self.server = []    # server room locations
+        self.bugs = []
         self.map_data = self.parse_map(map_text)
 
     def string_cell_item(self, item):
@@ -302,38 +305,32 @@ class Hackman(Game):
         return [0, 1]
 
     def board_symbol(self, cell):
-        if cell == PLAYER1:
+        if PLAYER1 in cell:
             return '0'
-        elif cell == PLAYER2:
+        elif PLAYER2 in cell:
             return '1'
-        elif cell == BUG:
+        elif BUG in cell:
             return 'E'
-        elif cell == WEAPON:
+        elif WEAPON in cell:
             return 'W'
-        elif cell == CODE:
+        elif CODE in cell:
             return 'C'
-        elif cell == LAND:
+        elif LAND in cell:
             return '.'
-        elif cell == WATER:
+        elif WATER in cell:
             return 'x'
+        elif len(cell) == 0:
+            return '.'
         else:
-            raise ValueError ("Invalid board_symbol: " + cell)
+            raise ValueError ("Invalid board_symbol: " + str(cell))
 
     def text_board(self):
-        count = 0
         print ("\n")
-        output = ""
-        for cell in self.field:
-            if count >= field_size:
-                print(output)
-                output=""
-                count = 0
-            if len(cell) > 0:
-                output += self.board_symbol(cell[0])
-            else:
-                output += self.board_symbol(LAND)
-            count += 1
-        print(output)
+        for row in self.field:
+            print("")
+            for cell in row:
+                sys.stdout.write(self.board_symbol(cell))
+        print("\n")
 
     def player_cell (self, player):
         if player == 0: return PLAYER1 
@@ -360,6 +357,60 @@ class Hackman(Game):
             self.field[row][col].append(self.player_cell(player))
             p.row = row
             p.col = col
+
+    def remove_snippets(self, cell):
+        cell = [x for x in cell if x != CODE]
+
+    def remove_cell_bug(self, cell):
+        result = []
+        removed = False
+        for item in cell:
+            if item == BUG and not removed:
+                removed = True
+            else:
+                result.append(item)
+        cell = result
+
+    def remove_list_bug(self, row, col):
+        removed = False
+        result = []
+        for bug in self.bugs:
+            if (not removed) and bug.row == row and bug.col == col:
+                removed = True
+            else:
+                result.append(bug)
+        self.bugs = result
+
+    def remove_bug(self, row, col):
+        self.remove_cell_bug(self.field[row][col])
+        self.remove_list_bug(row, col)
+
+    def interact(self, cell, row, col):
+        cell_players = self.players_in_cell(cell)
+        cell_bugs = self.bugs_in_cell(cell)
+        cell_snippets = self.snippets_in_cell(cell)
+        if len(cell_players) > 0:
+            if cell_bugs > 0:
+                bug_killed = min (1, self.players_with_swords())
+                for player in cell_players:
+                    self.collide_bugs(player, cell_bugs)
+                if bug_killed > 0:
+                    self.remove_bug(row, col)
+            if cell_snippets > 0:
+                num_players = len(cell_players)
+                if num_players > 1:
+                    for snippet in range(0, cell_snippets):
+                        chosen = random.choice(cell_players)
+                        self.award_snippets(chosen, 1)
+                else:
+                    self.award_snippets(cell_players[0], cell_snippets)
+                self.remove_snippets(cell)
+
+    def resolve_interactions(self):
+        for row in self.field:
+            for cell in self.field:
+                if len(cell) > 1:
+                    self.interact(cell)
 
     def do_orders(self):
         """ Execute player orders and handle conflicts
@@ -429,7 +480,7 @@ class Hackman(Game):
     def start_turn(self):
         """ Called by engine at the start of the turn """
         self.turn += 1
-#        self.text_board()
+        self.text_board()
 #        self.text_macroboard()
         self.orders = [[] for _ in range(self.num_players)]
 
