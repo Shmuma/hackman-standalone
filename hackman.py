@@ -97,6 +97,7 @@ class Hackman(Game):
 
         self.server = []    # server room locations
         self.bugs = []
+        self.snippets_collected = 0
         self.map_data = self.parse_map(map_text)
 
         self.spawn_snippet()
@@ -407,6 +408,37 @@ class Hackman(Game):
             (row, col) = chosen
             self.field[row][col].append(CODE)
 
+    def spawn_bug(self):
+        if len(self.server) > 0:
+            chosen = random.choice(self.server)
+            (row, col) = chosen
+            bug = bug.Bug()
+            bug.row = row
+            bug.col = col
+            bug.dir = random.randint(0, 3)
+            self.field[row][col].append(BUG)
+
+    def players_in_cell(self, cell):
+        result = []
+        for item in cell:
+            if ((item == PLAYER1) or (item == PLAYER2)) and item not in result:
+                result.append(item)
+        return result
+
+    def bugs_in_cell(self, cell):
+        result = 0
+        for item in cell:
+            if item == BUG:
+                result += 1
+        return result
+
+    def snippets_in_cell(self, cell):
+        result = 0
+        for item in cell:
+            if item == CODE:
+                result += 1
+        return result
+
     def interact(self, cell, row, col):
         cell_players = self.players_in_cell(cell)
         cell_bugs = self.bugs_in_cell(cell)
@@ -429,10 +461,10 @@ class Hackman(Game):
                 self.remove_snippets(cell)
 
     def resolve_interactions(self):
-        for row in self.field:
-            for cell in self.field:
+        for (ir, row) in enumerate(self.field):
+            for (ic, cell) in enumerate(self.field):
                 if len(cell) > 1:
-                    self.interact(cell)
+                    self.interact(cell, ir, ic)
 
     def do_orders(self):
         """ Execute player orders and handle conflicts
@@ -445,8 +477,6 @@ class Hackman(Game):
                 pass
         self.resolve_interactions()
 
-    def resolve_interactions(self):
-        pass
     # Common functions for all games
 
     def game_over(self):
