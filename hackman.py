@@ -2,14 +2,13 @@
 
 from random import randrange, choice, shuffle, randint, seed, random
 from math import cos, pi, sin, sqrt, atan
-from collections import deque, defaultdict
 
 from fractions import Fraction
 import operator
 from game import Game
 from copy import deepcopy
 
-from . import player
+import player
 
 try:
     from sys import maxint
@@ -26,7 +25,7 @@ BUG = 2
 WEAPON = 3
 CODE = 4
 
-VALID_ORDERS = ["up", "down", "left", "right"]
+VALID_ORDERS = ["up", "down", "left", "right", "pass"]
 
 ADJACENT = [
     (-1, 0),
@@ -48,7 +47,7 @@ class Hackman(Game):
         if 'timebank' in options:
             self.timebank = int(options['timebank'])
         self.time_per_move = int(options['time_per_move'])
-        self.player_names = options['player_names']
+        self.player_names = ["player0", "player1"] #options['player_names']
         self.engine_seed = options.get('engine_seed',
             randint(-maxint-1, maxint))
         self.player_seed = options.get('player_seed',
@@ -56,6 +55,7 @@ class Hackman(Game):
 
         seed(self.engine_seed)
         self.turn = 0
+        self.turn_limit = int(options['turns'])
         self.num_players = 2 # map_data["players"]
         self.players = [player.Player(), player.Player()]
         self.player_to_begin = randint(0, self.num_players)
@@ -123,7 +123,20 @@ class Hackman(Game):
             return result
 
     def string_field (self, field):
-        return ','.join([self.output_cell (cell) for cell in field])
+        flat = []
+        for row in field:
+            for cell in row:
+                flat.append(cell)
+        return (','.join([self.output_cell (cell) for cell in flat]))
+
+    def init_grid (self, rows, cols):
+        result = []
+        for r in range(0, rows):
+            result.append([])
+            for c in range(0, cols):
+                result[r].append([])
+        return result
+                
 
     def parse_map(self, map_text):
         """ Parse the map_text into a more friendly data structure """
@@ -148,20 +161,20 @@ class Hackman(Game):
                 cols = int(value)
                 self.width = cols
                 if rows != None:
-                    grid = [([] * cols) * rows]
+                    grid = self.init_grid(rows, cols)
             elif key == "rows":
                 rows = int(value)
                 self.height = rows
                 if cols != None:
-                    grid = [ [ [] * cols] * rows]
+                    grid = self.init_grid(rows, cols)
 
             elif key == 'p':
                 loc = value.split()
                 p_num = int(loc[0])
                 p_row = int(loc[1])
                 p_col = int(loc[2])
-                player[p_num].row = p_row
-                player[p_num].col = p_col
+                self.players[p_num].row = p_row
+                self.players[p_num].col = p_col
 
             elif key == 'm':
                 if len(value) != cols:
@@ -171,6 +184,8 @@ class Hackman(Game):
                                     %(row, len(value), width))
                 for count_col, c in enumerate(value):
                     if c == MAP_OBJECT[WATER]:
+#                        print("len grid = " + str(len (grid)))
+#                        print("len grid[0] = " + str(len (grid[0])))
                         grid[count_row][count_col].append(WATER)
 #                    elif c == MAP_OBJECT[LAND]:
 #                        grid[count_row][count_col].append(LAND)
@@ -181,8 +196,8 @@ class Hackman(Game):
 
             elif key == 's':    # server room
                 loc = value.split()
-                p_row = int(loc[1])
-                p_col = int(loc[2])
+                p_row = int(loc[0])
+                p_col = int(loc[1])
                 self.server.append((p_row, p_col))
 
         if count_row != rows:
@@ -190,6 +205,7 @@ class Hackman(Game):
                                     "Incorrect number of rows in map "
                                     "Got %s, expected %s."
                                     %(count_row, rows))
+        self.field = grid
         return {
             "size": (rows, cols),
             "grid" : grid }
@@ -210,8 +226,8 @@ class Hackman(Game):
 
         """
         changes = []
-        changes.extend([['update game round', self.turn]])
-        changes.extend([['update game field', self.string_field(self.grid)]])
+        changes.extend([['update game round', self.turn + 1]])
+        changes.extend([['update game field', self.string_field(self.field)]])
         changes.extend([['update player0 snippets', self.players[0].snippets]])
         changes.extend([['update player0 has_weapon', self.players[0].has_weapon]])
         changes.extend([['update player0 is_paralyzed', self.players[0].is_paralyzed]])
@@ -232,6 +248,8 @@ class Hackman(Game):
             return {row: 0, col : -1}
         elif move == "right":
             return {row: 0, col : 1}
+        elif move == "pass":
+            return None
         else:
             raise ValueError("Failed to convert string to move: " + move)
 
@@ -264,9 +282,10 @@ class Hackman(Game):
                     continue
                 else:
                     move = self.convert_move(data[0])
+                if move:
+                    row, col = self.players[player].row + move.row, self.players[player].col + move.col
+                    orders.append((player, row, col))
 
-                row, col = self.player[player].row + move.row, self.player[player].col + move.col
-                orders.append((player, row, col))
                 valid.append(line)
 
             except ValueError:
@@ -327,16 +346,16 @@ class Hackman(Game):
                 result.append((trow, tcol))
 
     def is_legal(self, player, row, col):
-        in_range = (row, col) in self.adjacent_coords(self.player[player].row, self.player[player].col)
-        not_blocked = (WATER not in self.grid[row][col])
+        in_range = (row, col) in self.adjacent_coords(self.players[player].row, self.players[player].col)
+        not_blocked = (WATER not in self.field[row][col])
         return in_range and not_blocked
 
     def place_move(self, move):
         (player, row, col) = move
-        p = self.player[player]
+        p = self.players[player]
         if self.is_legal (player, row, col):
-            self.grid[p.row][p.col].remove(self.player_cell(player))
-            self.grid[row][col].append(self.player_cell(player))
+            self.field[p.row][p.col].remove(self.player_cell(player))
+            self.field[row][col].append(self.player_cell(player))
             p.row = row
             p.col = col
 
@@ -368,7 +387,7 @@ class Hackman(Game):
         elif len(self.remaining_players()) == 1:
             self.cutoff = 'lone survivor'
             return True
-        elif self.turn >= 200:
+        elif self.turn >= self.turn_limit:
             self.cutoff = 'turn limit reached'
             return True
         else: return False
@@ -377,7 +396,7 @@ class Hackman(Game):
         """ Used by engine to signal that a player is out of the game """
         print("Player killed: " + str(player))
         self.killed[player] = True
-        self.player[player].snippets = -1
+        self.players[player].snippets = -1
 
     def start_game(self):
         """ Called by engine at the start of the game """
@@ -388,7 +407,7 @@ class Hackman(Game):
         result = []
 
     def score_game(self):
-            return [self.player[0].snippets, self.player[1].snippets]
+            return [self.players[0].snippets, self.players[1].snippets]
 
     def finish_game(self):
         """ Called by engine at the end of the game """
@@ -457,12 +476,17 @@ class Hackman(Game):
             Used by engine to send bots startup info on turn 0
         """
         result = []
+        result.append(['settings player_names', ','.join(self.player_names)])
+        result.append(['settings your_bot', self.player_names[player]])
         result.append(['settings timebank', self.timebank])
         result.append(['settings time_per_move', self.time_per_move])
-        result.append(['settings your_botid', player + 1])
-        result.append(['settings player_names', ','.join(self.player_names)])
+        result.append(['settings your_botid', player])
+        result.append(['settings field_width', self.width])
+        result.append(['settings field_height', self.height])
+        result.append(['settings max_rounds', self.turn_limit])
+
         result.append(['settings player_seed', self.player_seed])
-        result.append(['settings num_players', self.num_players])
+        #result.append(['settings num_players', self.num_players])
         #message = self.get_player_state(player, self.timebank)
 
         result.append([]) # newline
@@ -506,7 +530,7 @@ class Hackman(Game):
             Used by engine for ranking
         """
         #if player is None:
-            return self.score
+        return self.score
         #else:
         #    return self.order_for_player(player, self.score)
 
@@ -561,5 +585,5 @@ class Hackman(Game):
 
 
     def bot_input_finished(self, line):
-        return line.lower().startswith('place_move')
+        return line.strip().lower() in VALID_ORDERS
 

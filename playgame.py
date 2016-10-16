@@ -102,7 +102,7 @@ def main(argv):
 
     # maximum number of turns that the game will be played
     parser.add_option("-t", "--turns", dest="turns",
-                      default=1000, type="int",
+                      default=200, type="int",
                       help="Number of turns in the game")
 
     parser.add_option("--serial", dest="serial",
@@ -264,6 +264,7 @@ def run_rounds(opts,args):
         "timebank": opts.loadtime,
         "time_per_move": opts.turntime,
 	"player_names" : args, #opts.player_names,
+    "turns" : opts.turns,
         "scenario": opts.scenario }
     if opts.player_seed != None:
         game_options['player_seed'] = opts.player_seed
@@ -290,8 +291,8 @@ def run_rounds(opts,args):
     for round in range(opts.rounds):
         # initialize game
         game_id = round + opts.game_id
-#        with open(opts.map, 'r') as map_file:
-        game_options['map'] = ""# map_file.read()
+        with open(opts.map, 'r') as map_file:
+            game_options['map'] = map_file.read()
         if opts.engine_seed:
             game_options['engine_seed'] = opts.engine_seed + round
         game = Hackman(game_options)
