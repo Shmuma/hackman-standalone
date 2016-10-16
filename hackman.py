@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 
-from random import randrange, choice, shuffle, randint, seed, random
 from math import cos, pi, sin, sqrt, atan
 import sys
+
+import random
 
 from fractions import Fraction
 import operator
@@ -36,6 +37,8 @@ ADJACENT = [
     (0, -1)
 ]
 
+SPAWN_DELAY = 8
+
 class Hackman(Game):
     def __init__(self, options=None):
         self.width = 0
@@ -45,22 +48,21 @@ class Hackman(Game):
 #        self.turns = int(options['turns'])
 #        self.loadtime = int(options['loadtime'])
 #        self.turntime = int(options['turntime'])
+        self.engine_seed = options.get('engine_seed',
+            random.randint(-maxint-1, maxint))
+        random.seed(self.engine_seed)
         self.timebank = 0
         if 'timebank' in options:
             self.timebank = int(options['timebank'])
         self.time_per_move = int(options['time_per_move'])
         self.player_names = ["player0", "player1"] #options['player_names']
-        self.engine_seed = options.get('engine_seed',
-            randint(-maxint-1, maxint))
         self.player_seed = options.get('player_seed',
-            randint(-maxint-1, maxint))
+            random.randint(-maxint-1, maxint))
 
-        seed(self.engine_seed)
         self.turn = 0
         self.turn_limit = int(options['turns'])
         self.num_players = 2 # map_data["players"]
         self.players = [player.Player(), player.Player()]
-        self.player_to_begin = randint(0, self.num_players)
         # used to cutoff games early
         self.cutoff_turns = 0
         # used to calculate the turn when the winner took the lead
@@ -96,6 +98,9 @@ class Hackman(Game):
         self.server = []    # server room locations
         self.bugs = []
         self.map_data = self.parse_map(map_text)
+
+        self.spawn_snippet()
+        self.spawn_snippet()
 
     def string_cell_item(self, item):
         if item == PLAYER1:
@@ -385,6 +390,23 @@ class Hackman(Game):
         self.remove_cell_bug(self.field[row][col])
         self.remove_list_bug(row, col)
 
+    def random_empty_cell(self):
+        empty = []
+        for (ir, row) in enumerate(self.field):
+            for (ic, cell) in enumerate(row):
+                if len(cell) == 0:
+                    empty.append((ir, ic))
+        if len(empty) > 0:
+            return random.choice(empty)
+        else:
+            return None
+
+    def spawn_snippet(self):
+        chosen = self.random_empty_cell()
+        if chosen:
+            (row, col) = chosen
+            self.field[row][col].append(CODE)
+
     def interact(self, cell, row, col):
         cell_players = self.players_in_cell(cell)
         cell_bugs = self.bugs_in_cell(cell)
@@ -480,6 +502,8 @@ class Hackman(Game):
     def start_turn(self):
         """ Called by engine at the start of the turn """
         self.turn += 1
+        if (self.turn % SPAWN_DELAY == 0):
+            self.spawn_snippet()
         self.text_board()
 #        self.text_macroboard()
         self.orders = [[] for _ in range(self.num_players)]
