@@ -175,6 +175,7 @@ class Hackman(Game):
                 p_col = int(loc[2])
                 self.players[p_num].row = p_row
                 self.players[p_num].col = p_col
+                grid[p_row][p_col].append(p_num)
 
             elif key == 'm':
                 if len(value) != cols:
@@ -241,13 +242,13 @@ class Hackman(Game):
         """ Convert text string to co-ordinate offset
         """
         if move == "up":
-            return {row : -1, col : 0}
+            return {"row" : -1, "col" : 0}
         elif move == "down":
-            return {row: 1, col : 0}
+            return {"row": 1, "col" : 0}
         elif move == "left":
-            return {row: 0, col : -1}
+            return {"row": 0, "col" : -1}
         elif move == "right":
-            return {row: 0, col : 1}
+            return {"row": 0, "col" : 1}
         elif move == "pass":
             return None
         else:
@@ -283,7 +284,7 @@ class Hackman(Game):
                 else:
                     move = self.convert_move(data[0])
                 if move:
-                    row, col = self.players[player].row + move.row, self.players[player].col + move.col
+                    row, col = self.players[player].row + move['row'], self.players[player].col + move['col']
                     orders.append((player, row, col))
 
                 valid.append(line)
@@ -344,6 +345,7 @@ class Hackman(Game):
             (trow, tcol) = (row + orow, col + ocol)
             if self.in_bounds (trow, tcol):
                 result.append((trow, tcol))
+        return result
 
     def is_legal(self, player, row, col):
         in_range = (row, col) in self.adjacent_coords(self.players[player].row, self.players[player].col)
