@@ -364,8 +364,8 @@ class Hackman(Game):
             p.row = row
             p.col = col
 
-    def remove_snippets(self, cell):
-        cell = [x for x in cell if x != CODE]
+    def remove_snippets(self, row, col):
+        self.field[row][col] = [x for x in self.field[row][col] if x != CODE]
 
     def remove_cell_bug(self, cell):
         result = []
@@ -421,7 +421,7 @@ class Hackman(Game):
     def players_in_cell(self, cell):
         result = []
         for item in cell:
-            if ((item == PLAYER1) or (item == PLAYER2)) and item not in result:
+            if ((item == PLAYER1) or (item == PLAYER2)) and (item not in result):
                 result.append(item)
         return result
 
@@ -439,11 +439,17 @@ class Hackman(Game):
                 result += 1
         return result
 
+    def award_snippets(self, player, number):
+        self.players[player].snippets += number
+
     def interact(self, cell, row, col):
         cell_players = self.players_in_cell(cell)
+#        sys.stderr.write(str(cell) + "\n")
+#        sys.stderr.write(str(cell_players) + "\n")
         cell_bugs = self.bugs_in_cell(cell)
         cell_snippets = self.snippets_in_cell(cell)
         if len(cell_players) > 0:
+            sys.stderr.write("interacting with player\n")
             if cell_bugs > 0:
                 bug_killed = min (1, self.players_with_swords())
                 for player in cell_players:
@@ -452,18 +458,19 @@ class Hackman(Game):
                     self.remove_bug(row, col)
             if cell_snippets > 0:
                 num_players = len(cell_players)
+                sys.stderr.write("Player and snippet found in same cell\n")
                 if num_players > 1:
                     for snippet in range(0, cell_snippets):
                         chosen = random.choice(cell_players)
                         self.award_snippets(chosen, 1)
                 else:
                     self.award_snippets(cell_players[0], cell_snippets)
-                self.remove_snippets(cell)
+                self.remove_snippets(row, col)
 
     def resolve_interactions(self):
         for (ir, row) in enumerate(self.field):
-            for (ic, cell) in enumerate(self.field):
-                if len(cell) > 1:
+            for (ic, cell) in enumerate(row):
+                if len(cell) > 0:
                     self.interact(cell, ir, ic)
 
     def do_orders(self):
@@ -606,6 +613,7 @@ class Hackman(Game):
             Used by engine to send state to bots
         """
         return self.render_changes(player, time_to_move)
+
     def is_alive(self, player):
         """ Determine if player is still alive
 
