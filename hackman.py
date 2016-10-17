@@ -37,7 +37,8 @@ ADJACENT = [
     (0, -1)
 ]
 
-SPAWN_DELAY = 8
+CODE_SPAWN_DELAY = 8
+WEAPON_SPAWN_DELAY = 20
 BUG_SPAWN_COUNT = 5
 HIT_PENALTY = 4
 
@@ -369,6 +370,16 @@ class Hackman(Game):
     def remove_snippets(self, row, col):
         self.field[row][col] = [x for x in self.field[row][col] if x != CODE]
 
+    def remove_sword(self, row, col):
+        result = []
+        removed = False
+        for item in self.field[row][col]:
+            if item == WEAPON and not removed:
+                removed = True
+            else:
+                result.append(item)
+        self.field[row][col] = result
+
     def remove_cell_bug(self, row, col):
         result = []
         removed = False
@@ -410,6 +421,12 @@ class Hackman(Game):
             (row, col) = chosen
             self.field[row][col].append(CODE)
 
+    def spawn_weapon(self):
+        chosen = self.random_empty_cell()
+        if chosen:
+            (row, col) = chosen
+            self.field[row][col].append(WEAPON)
+
     def spawn_bug(self):
         if len(self.server) > 0:
             chosen = random.choice(self.server)
@@ -442,6 +459,13 @@ class Hackman(Game):
                 result += 1
         return result
 
+    def swords_in_cell(self, cell):
+        result = 0
+        for item in cell:
+            if item == WEAPON:
+                result += 1
+        return result
+
     def award_snippets(self, player, number):
         self.players[player].has_collected = True
         self.players[player].snippets += number
@@ -449,6 +473,9 @@ class Hackman(Game):
         while self.snippets_collected >= BUG_SPAWN_COUNT:
             self.snippets_collected -= BUG_SPAWN_COUNT
             self.spawn_bug()
+
+    def award_sword(self, player):
+        self.players[player].has_weapon = True
 
     def players_with_swords(self, players):
         result = 0
@@ -474,6 +501,7 @@ class Hackman(Game):
 #        sys.stderr.write(str(cell_players) + "\n")
         cell_bugs = self.bugs_in_cell(cell)
         cell_snippets = self.snippets_in_cell(cell)
+        cell_swords = self.swords_in_cell(cell)
         if len(cell_players) > 0:
 #            sys.stderr.write("interacting with player\n")
             if cell_bugs > 0:
@@ -486,12 +514,23 @@ class Hackman(Game):
                 num_players = len(cell_players)
 #                sys.stderr.write("Player and snippet found in same cell\n")
                 if num_players > 1:
-                    for snippet in range(0, cell_snippets):
+                    for snippet in range(1, cell_snippets):
                         chosen = random.choice(cell_players)
                         self.award_snippets(chosen, 1)
                 else:
                     self.award_snippets(cell_players[0], cell_snippets)
                 self.remove_snippets(row, col)
+            if cell_swords > 0:
+                num_players = len(cell_players)
+#                sys.stderr.write("Player and snippet found in same cell\n")
+                if num_players > 1:
+                    for sword in range(1, cell_swords):
+                        chosen = random.choice(cell_players)
+                        self.award_sword(chosen)
+                        self.remove_sword(row, col)
+                else:
+                    self.award_snippets(cell_players[0], cell_snippets)
+                
 
     def resolve_interactions(self):
         for (ir, row) in enumerate(self.field):
@@ -566,8 +605,10 @@ class Hackman(Game):
     def start_turn(self):
         """ Called by engine at the start of the turn """
         self.turn += 1
-        if (self.turn % SPAWN_DELAY == 0):
+        if (self.turn % CODE_SPAWN_DELAY == 0):
             self.spawn_snippet()
+        if (self.turn % WEAPON_SPAWN_DELAY == 0):
+            self.spawn_weapon()
         self.text_board()
 #        self.text_macroboard()
         self.orders = [[] for _ in range(self.num_players)]
