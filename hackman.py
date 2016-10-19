@@ -470,12 +470,14 @@ class Hackman(Game):
         self.players[player].has_collected = True
         self.players[player].snippets += number
         self.snippets_collected += number
+        sys.stderr.write(str(number) + " snippet(s) picked up by player" + str(player) + ", score is " + str(self.players[player].snippets) + "\n")
         while self.snippets_collected >= BUG_SPAWN_COUNT:
             self.snippets_collected -= BUG_SPAWN_COUNT
             self.spawn_bug()
 
     def award_sword(self, player):
         self.players[player].has_weapon = True
+        sys.stderr.write("Sword picked up by player" + str(player) + "\n")
 
     def players_with_swords(self, players):
         result = 0
@@ -488,9 +490,13 @@ class Hackman(Game):
     def collide_bugs(self, player, bugs):
         p = self.players[player]
         if p.has_weapon:
+            sys.stderr.write("player" + str(player) + " hits bug with weapon.\n")
             p.has_weapon = False
-        elif p.has_collected:
+#        elif p.has_collected:
+        else:
+            sys.stderr.write("player" + str(player) + " hit by bug.\n")
             p.snippets -= HIT_PENALTY
+            sys.stderr.write("player" + str(player) + " score is " + str(p.snippets) + "\n")
             if p.snippets < 0:
                 self.kill_player(player)
         
@@ -509,6 +515,7 @@ class Hackman(Game):
                 for player in cell_players:
                     self.collide_bugs(player, cell_bugs)
                 if bug_killed > 0:
+                    sys.stderr.write("One bug removed with sword\n")
                     self.remove_bug(row, col)
             if cell_snippets > 0:
                 num_players = len(cell_players)
@@ -529,10 +536,14 @@ class Hackman(Game):
                         self.award_sword(chosen)
                         self.remove_sword(row, col)
                 else:
-                    self.award_snippets(cell_players[0], cell_snippets)
+                    self.award_sword(cell_players[0])
                 
 
+    def swap_places_interact(self):
+        pass
+
     def resolve_interactions(self):
+        self.swap_places_interact()
         for (ir, row) in enumerate(self.field):
             for (ic, cell) in enumerate(row):
                 if len(cell) > 0:
