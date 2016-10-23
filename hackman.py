@@ -445,7 +445,7 @@ class Hackman(Game):
             newbug.col = col
             newbug.dir = random.randint(0, 3)
             newbug.prev_row = row
-            newbug,prev_col = col
+            newbug.prev_col = col
             self.bugs.append(newbug)
             self.field[row][col].append(BUG)
 
@@ -513,7 +513,7 @@ class Hackman(Game):
     
     def remove_bugs(self, row, col):
         self.field[row][col] = [x for x in self.field[row][col] if x != BUG]
-        remove_list_bugs(row, col)
+        self.remove_list_bugs(row, col)
 
     def interact(self, cell, row, col):
         cell_players = self.players_in_cell(cell)
@@ -554,7 +554,7 @@ class Hackman(Game):
                     self.award_sword(cell_players[0])
                 
     def remove_specific_bug(self, bug): # FIXME duplicating logic because too sleepy to think
-        self.bugs = [b for b in self.bugs if not (b === bug)
+        self.bugs = [b for b in self.bugs if not (b == bug)]
         tile_items = []
         removed = False
         for item in self.field[bug.row][bug.col]:
@@ -564,10 +564,17 @@ class Hackman(Game):
                 tile_items.append(item)
         self.field[bug.row][bug.col] = tile_items
 
+    def did_swap(self, e1, e2):
+        return e1.row == e2.prev_row and e1.prev_row == e2.row and e1.col == e2.prev_col and e1.prev_col == e2.col
+
+    def get_bugs_swapped(self, player):
+        return [bug for bug in self.bugs if (self.did_swap(player, bug))]
+
     def swap_places_interact(self):
         for pnum, player in enumerate(self.players):
             bugs_swapped = self.get_bugs_swapped(player)
             if len(bugs_swapped) > 0:
+                print("swap\n")
                 num_bugs = len(bugs_swapped)
                 collide_bugs(pnum, num_bugs)
             for bug in bugs_swapped:
