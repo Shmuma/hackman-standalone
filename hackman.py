@@ -400,6 +400,15 @@ class Hackman(Game):
                 result.append(bug)
         self.bugs = result
 
+    def remove_list_bugs(self, row, col):
+        result = []
+        for bug in self.bugs:
+            if bug.row == row and bug.col == col:
+                removed = True
+            else:
+                result.append(bug)
+        self.bugs = result
+
     def remove_bug(self, row, col):
         self.remove_cell_bug(row, col)
         self.remove_list_bug(row, col)
@@ -435,6 +444,8 @@ class Hackman(Game):
             newbug.row = row
             newbug.col = col
             newbug.dir = random.randint(0, 3)
+            newbug.prev_row = row
+            newbug,prev_col = col
             self.bugs.append(newbug)
             self.field[row][col].append(BUG)
 
@@ -499,7 +510,10 @@ class Hackman(Game):
             sys.stderr.write("player" + str(player) + " score is " + str(p.snippets) + "\n")
             if p.snippets < 0:
                 self.kill_player(player)
-        
+    
+    def remove_bugs(self, row, col):
+        self.field[row][col] = [x for x in self.field[row][col] if x != BUG]
+        remove_list_bugs(row, col)
 
     def interact(self, cell, row, col):
         cell_players = self.players_in_cell(cell)
@@ -517,6 +531,7 @@ class Hackman(Game):
                 if bug_killed > 0:
                     sys.stderr.write("One bug removed with sword\n")
                     self.remove_bug(row, col)
+                self.remove_bugs(row, col)
             if cell_snippets > 0:
                 num_players = len(cell_players)
 #                sys.stderr.write("Player and snippet found in same cell\n")
@@ -538,9 +553,26 @@ class Hackman(Game):
                 else:
                     self.award_sword(cell_players[0])
                 
+    def remove_specific_bug(self, bug): # FIXME duplicating logic because too sleepy to think
+        self.bugs = [b for b in self.bugs if not (b === bug)
+        tile_items = []
+        removed = False
+        for item in self.field[bug.row][bug.col]:
+            if not removed and item == BUG:
+                removed = True
+            else:
+                tile_items.append(item)
+        self.field[bug.row][bug.col] = tile_items
 
     def swap_places_interact(self):
-        pass
+        for pnum, player in enumerate(self.players):
+            bugs_swapped = self.get_bugs_swapped(player)
+            if len(bugs_swapped) > 0:
+                num_bugs = len(bugs_swapped)
+                collide_bugs(pnum, num_bugs)
+            for bug in bugs_swapped:
+                self.remove_specific_bug(bug)
+                    
 
     def resolve_interactions(self):
         self.swap_places_interact()
