@@ -500,6 +500,19 @@ class Hackman(Game):
                 result += 1
         return result
 
+    def collide_players(self, player_a, player_b):
+        print("Players collide\n")
+        if player_a.has_weapon:
+            player_a.has_weapon = False
+            player_b.snippets -= HIT_PENALTY
+            for _ in range(0, HIT_PENALTY):
+                self.spawn_snippet()
+        if player_b.has_weapon:
+            player_b.has_weapon = False
+            player_a.snippets -= HIT_PENALTY
+            for _ in range(0, HIT_PENALTY):
+                self.spawn_snippet()
+
     def collide_bugs(self, player, bugs):
         p = self.players[player]
         if p.has_weapon:
@@ -516,6 +529,12 @@ class Hackman(Game):
     def remove_bugs(self, row, col):
         self.field[row][col] = [x for x in self.field[row][col] if x != BUG]
         self.remove_list_bugs(row, col)
+
+    def check_collide_players(self):
+        p0 = self.players[0]
+        p1 = self.players[1]
+        if p0.row == p1.row and p0.col == p1.col:
+            self.collide_players(p0, p1)
 
     def interact(self, cell, row, col):
         cell_players = self.players_in_cell(cell)
@@ -554,6 +573,7 @@ class Hackman(Game):
                         self.remove_sword(row, col)
                 else:
                     self.award_sword(cell_players[0])
+        self.check_collide_players()
                 
     def remove_specific_bug(self, bug): # FIXME duplicating logic because too sleepy to think
         self.bugs = [b for b in self.bugs if not (b == bug)]
@@ -581,6 +601,10 @@ class Hackman(Game):
                 self.collide_bugs(pnum, num_bugs)
             for bug in bugs_swapped:
                 self.remove_specific_bug(bug)
+        p0 = self.players[0]
+        p1 = self.players[1]
+        if self.did_swap(p0, p1):
+            self.collide_players(p0, p1)
                     
 
     def resolve_interactions(self):
