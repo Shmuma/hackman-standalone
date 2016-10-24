@@ -121,7 +121,7 @@ class Hackman(Game):
             return ''
 
     def in_bounds (self, row, col):
-        return row > 0 and col > 0 and col < self.width and row < self.height
+        return row >= 0 and col >= 0 and col < self.width and row < self.height
 
     def output_cell (self, cell):
         if len(cell) == 0:
