@@ -364,6 +364,8 @@ class Hackman(Game):
         if self.is_legal (player, row, col):
             self.field[p.row][p.col].remove(self.player_cell(player))
             self.field[row][col].append(self.player_cell(player))
+            p.prev_row = p.row
+            p.prev_col = p.col
             p.row = row
             p.col = col
 
@@ -574,9 +576,9 @@ class Hackman(Game):
         for pnum, player in enumerate(self.players):
             bugs_swapped = self.get_bugs_swapped(player)
             if len(bugs_swapped) > 0:
-                print("swap\n")
+                print("swap\n\n")
                 num_bugs = len(bugs_swapped)
-                collide_bugs(pnum, num_bugs)
+                self.collide_bugs(pnum, num_bugs)
             for bug in bugs_swapped:
                 self.remove_specific_bug(bug)
                     
@@ -588,6 +590,30 @@ class Hackman(Game):
                 if len(cell) > 0:
                     self.interact(cell, ir, ic)
 
+    def not_blocked(self, row, col):
+        return (WATER not in self.field[row][col])
+
+    def not_blocked_adjacent(self, row, col):
+        result = []
+        for (count, (orow, ocol)) in enumerate(ADJACENT):
+            trow, tcol = row + orow, col + ocol
+            if self.in_bounds(trow, tcol) and self.not_blocked(trow, tcol):
+                result.append((count, (trow, tcol)))
+        return result
+
+    def move_bug(self, bug, (mdir, (mrow, mcol))):
+        bug.mdir = mdir
+        bug.prev_row = bug.row
+        bug.prev_col = bug.col
+        bug.row = mrow
+        bug.col = mcol
+
+    def move_bugs(self):
+        for bug in self.bugs:
+            legal = self.not_blocked_adjacent(bug.row, bug.col)
+            move = random.choice(legal)
+            self.move_bug(bug, move)
+
     def do_orders(self):
         """ Execute player orders and handle conflicts
         """
@@ -597,6 +623,7 @@ class Hackman(Game):
                     self.place_move (self.orders[player][0])
             else:
                 pass
+        self.move_bugs()
         self.resolve_interactions()
 
     # Common functions for all games
