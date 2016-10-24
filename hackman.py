@@ -483,14 +483,14 @@ class Hackman(Game):
         self.players[player].has_collected = True
         self.players[player].snippets += number
         self.snippets_collected += number
-        sys.stderr.write(str(number) + " snippet(s) picked up by player" + str(player) + ", score is " + str(self.players[player].snippets) + "\n")
+        sys.stdout.write(str(number) + " snippet(s) picked up by player" + str(player) + ", score is " + str(self.players[player].snippets) + "\n")
         while self.snippets_collected >= BUG_SPAWN_COUNT:
             self.snippets_collected -= BUG_SPAWN_COUNT
             self.spawn_bug()
 
     def award_sword(self, player):
         self.players[player].has_weapon = True
-        sys.stderr.write("Sword picked up by player" + str(player) + "\n")
+        sys.stdout.write("Sword picked up by player" + str(player) + "\n")
 
     def players_with_swords(self, players):
         result = 0
@@ -516,13 +516,13 @@ class Hackman(Game):
     def collide_bugs(self, player, bugs):
         p = self.players[player]
         if p.has_weapon:
-            sys.stderr.write("player" + str(player) + " hits bug with weapon.\n")
+            sys.stdout.write("player" + str(player) + " hits bug with weapon.\n")
             p.has_weapon = False
 #        elif p.has_collected:
         else:
-            sys.stderr.write("player" + str(player) + " hit by bug.\n")
+            sys.stdout.write("player" + str(player) + " hit by bug.\n")
             p.snippets -= HIT_PENALTY
-            sys.stderr.write("player" + str(player) + " score is " + str(p.snippets) + "\n")
+            sys.stdout.write("player" + str(player) + " score is " + str(p.snippets) + "\n")
             if p.snippets < 0:
                 self.kill_player(player)
     
@@ -538,24 +538,24 @@ class Hackman(Game):
 
     def interact(self, cell, row, col):
         cell_players = self.players_in_cell(cell)
-#        sys.stderr.write(str(cell) + "\n")
-#        sys.stderr.write(str(cell_players) + "\n")
+#        sys.stdout.write(str(cell) + "\n")
+#        sys.stdout.write(str(cell_players) + "\n")
         cell_bugs = self.bugs_in_cell(cell)
         cell_snippets = self.snippets_in_cell(cell)
         cell_swords = self.swords_in_cell(cell)
         if len(cell_players) > 0:
-#            sys.stderr.write("interacting with player\n")
+#            sys.stdout.write("interacting with player\n")
             if cell_bugs > 0:
                 bug_killed = min (1, self.players_with_swords(cell_players))
                 for player in cell_players:
                     self.collide_bugs(player, cell_bugs)
                 if bug_killed > 0:
-                    sys.stderr.write("One bug removed with sword\n")
+                    sys.stdout.write("One bug removed with sword\n")
                     self.remove_bug(row, col)
                 self.remove_bugs(row, col)
             if cell_snippets > 0:
                 num_players = len(cell_players)
-#                sys.stderr.write("Player and snippet found in same cell\n")
+#                sys.stdout.write("Player and snippet found in same cell\n")
                 if num_players > 1:
                     for snippet in range(1, cell_snippets):
                         chosen = random.choice(cell_players)
@@ -565,7 +565,7 @@ class Hackman(Game):
                 self.remove_snippets(row, col)
             if cell_swords > 0:
                 num_players = len(cell_players)
-#                sys.stderr.write("Player and snippet found in same cell\n")
+#                sys.stdout.write("Player and snippet found in same cell\n")
                 if num_players > 1:
                     for sword in range(1, cell_swords):
                         chosen = random.choice(cell_players)
@@ -631,6 +631,8 @@ class Hackman(Game):
         bug.prev_col = bug.col
         bug.row = mrow
         bug.col = mcol
+        self.remove_cell_bug(bug.prev_row, bug.prev_col)
+        self.field[mrow][mcol].append(BUG)
 
     def move_bugs(self):
         for bug in self.bugs:
