@@ -573,6 +573,7 @@ class Hackman(Game):
                         self.remove_sword(row, col)
                 else:
                     self.award_sword(cell_players[0])
+                    self.remove_sword(row, col)
         self.check_collide_players()
                 
     def remove_specific_bug(self, bug): # FIXME duplicating logic because too sleepy to think
